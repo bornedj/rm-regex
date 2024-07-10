@@ -1,14 +1,14 @@
 //! Fast recursive deletion of files and directories
 use clap::{ArgAction, Parser};
-use std::path::PathBuf;
+use std::{fs::{read_dir, DirEntry}, path::Path};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
     expression: String,
 
-    #[arg(short, long, value_name = "ROOT")]
-    starting_dir: Option<PathBuf>,
+    #[arg(short = 'r', long, value_name = "ROOT")]
+    root_dir: Option<String>,
 
     #[arg(short = 'd', long, action=ArgAction::SetTrue)]
     dir: bool,
@@ -17,11 +17,20 @@ pub struct Cli {
     file: bool,
 }
 
-/// Represents the parsed arguments in the order they are passed
-type ParsedArgs = (String, Option<PathBuf>, bool, bool);
+type ParsedArgs = (String, String, bool, bool);
 
-/// Returns the parsed arguments
 pub fn destructure_args() -> ParsedArgs {
     let cli = Cli::parse();
-    (cli.expression, cli.starting_dir, cli.dir, cli.file)
+    match cli.root_dir {
+        Some(path) => (cli.expression, path, cli.dir, cli.file),
+        None => (cli.expression, "./".to_owned(), cli.dir, cli.file)
+    }
+}
+
+pub fn collect_entries(starting_dir: &String) -> Result<Vec<DirEntry>, std::io::Error> {
+    let path = Path::new(starting_dir);
+
+    let read_result = read_dir(path)?;
+    read_result.collect()
+}
 }
