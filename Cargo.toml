@@ -9,3 +9,4 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
+clap = { version = "4.5.9", features = ["derive"] }
