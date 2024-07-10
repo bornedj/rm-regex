@@ -7,6 +7,6 @@ fn main() {
     println!("dir: {dir}");
     println!("file: {file}");
 
-    let entries = collect_entries(&starting_dir).expect("Failed to find entries under the specified starting directory.");
+    let entries = collect_entries(&starting_dir, dir, file).expect("Failed to find entries under the specified starting directory.");
     println!("{:?}", entries);
 }
