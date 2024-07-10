@@ -33,4 +33,34 @@ pub fn collect_entries(starting_dir: &String) -> Result<Vec<DirEntry>, std::io::
     let read_result = read_dir(path)?;
     read_result.collect()
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    mod collect_entries {
+        use std::fs::{remove_dir, DirBuilder};
+
+        use super::collect_entries;
+        #[test]
+        fn should_result_in_err_with_nonexistent_dir() {
+            let result = collect_entries(&String::from("nonexistent_dir"));
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn should_return_ok_if_dir_exists() {
+            let path = "foo";
+
+            // creating empty dir
+            DirBuilder::new()
+                .create(path).expect("Failed to create dir in test");
+            let result = collect_entries(&path.to_owned());
+
+            // remove dir
+            remove_dir(path).expect("Failed to delete created dir");
+
+            assert!(result.is_ok());
+        }
+    }
+
 }
