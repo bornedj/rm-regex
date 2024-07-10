@@ -1,6 +1,10 @@
 //! Fast recursive deletion of files and directories
+use std::{
+    fs::{read_dir, DirEntry},
+    path::Path,
+};
+
 use clap::{ArgAction, Parser};
-use std::{fs::{read_dir, DirEntry}, path::Path};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -17,21 +21,39 @@ pub struct Cli {
     file: bool,
 }
 
+pub enum Mode {}
+
 type ParsedArgs = (String, String, bool, bool);
 
 pub fn destructure_args() -> ParsedArgs {
     let cli = Cli::parse();
+
     match cli.root_dir {
         Some(path) => (cli.expression, path, cli.dir, cli.file),
-        None => (cli.expression, "./".to_owned(), cli.dir, cli.file)
+        None => (cli.expression, "./".to_owned(), cli.dir, cli.file),
     }
 }
 
-pub fn collect_entries(starting_dir: &String) -> Result<Vec<DirEntry>, std::io::Error> {
+pub fn collect_entries(
+    starting_dir: &String,
+    dir: bool,
+    file: bool,
+) -> Result<Vec<DirEntry>, std::io::Error> {
     let path = Path::new(starting_dir);
 
-    let read_result = read_dir(path)?;
-    read_result.collect()
+    if dir && file {
+        return read_dir(path)?.collect();
+    }
+
+    if dir {
+        return read_dir(path)?
+            .filter(|entry| entry.as_ref().unwrap().metadata().unwrap().is_dir())
+            .collect();
+    }
+
+    read_dir(path)?
+        .filter(|entry| entry.as_ref().unwrap().metadata().unwrap().is_file())
+        .collect()
 }
 
 #[cfg(test)]
@@ -43,7 +65,7 @@ mod test {
         use super::collect_entries;
         #[test]
         fn should_result_in_err_with_nonexistent_dir() {
-            let result = collect_entries(&String::from("nonexistent_dir"));
+            let result = collect_entries(&String::from("nonexistent_dir"), true, false);
             assert!(result.is_err());
         }
 
