@@ -21,8 +21,6 @@ pub struct Cli {
     file: bool,
 }
 
-pub enum Mode {}
-
 type ParsedArgs = (String, String, bool, bool);
 
 pub fn destructure_args() -> ParsedArgs {
