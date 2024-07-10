@@ -60,7 +60,10 @@ pub fn collect_entries(
 mod test {
     use super::*;
     mod collect_entries {
-        use std::fs::{remove_dir, DirBuilder};
+        use std::{
+            fs::{create_dir_all, remove_dir, remove_file, DirBuilder, File},
+            io::Write,
+        };
 
         use super::collect_entries;
         #[test]
@@ -71,7 +74,7 @@ mod test {
 
         #[test]
         fn should_return_ok_if_dir_exists() {
-            let path = "foo";
+            let path = "./foo";
 
             // creating empty dir
             DirBuilder::new()
@@ -87,12 +90,40 @@ mod test {
 
         #[test]
         fn should_return_only_file_entries_if_file_true() {
-            let path = "foo";
+            create_dir_all("./bar/baz").expect("Failed to create dirs");
 
-            // filling mock dir
-            DirBuilder::new()
-                .create(path)
-                .expect("Failed to create dir in test");
+            let mut f = File::create("./bar/foo.txt").expect("Failed to create new file.");
+            f.write_all(b"test")
+                .expect("Failed to write to created file.");
+
+            let result = collect_entries(&"./bar/".to_owned(), false, true);
+
+            // remove mocked files and dir
+            remove_dir("./bar/baz").expect("Failed to remove foo/bar");
+            remove_file("./bar/foo.txt").expect("Failed to remove foo/baz.txt");
+            remove_dir("./bar").expect("Failed to remove foo");
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap().len(), 1);
+        }
+
+        #[test]
+        fn should_return_only_dir_entries_if_file_true() {
+            create_dir_all("baz/foo").expect("Failed to create dirs");
+
+            let mut f = File::create("baz/bar.txt").expect("Failed to create new file.");
+            f.write_all(b"test")
+                .expect("Failed to write to created file.");
+
+            let result = collect_entries(&"baz/".to_owned(), true, false);
+
+            // remove mocked files and dir
+            remove_dir("baz/foo").expect("Failed to remove baz/foo");
+            remove_file("baz/bar.txt").expect("Failed to remove baz/bar.txt");
+            remove_dir("baz").expect("Failed to remove foo");
+
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap().len(), 1);
         }
     }
 }
