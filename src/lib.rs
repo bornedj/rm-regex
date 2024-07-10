@@ -75,14 +75,24 @@ mod test {
 
             // creating empty dir
             DirBuilder::new()
-                .create(path).expect("Failed to create dir in test");
-            let result = collect_entries(&path.to_owned());
+                .create(path)
+                .expect("Failed to create dir in test");
+            let result = collect_entries(&path.to_owned(), true, false);
 
             // remove dir
             remove_dir(path).expect("Failed to delete created dir");
 
             assert!(result.is_ok());
         }
-    }
 
+        #[test]
+        fn should_return_only_file_entries_if_file_true() {
+            let path = "foo";
+
+            // filling mock dir
+            DirBuilder::new()
+                .create(path)
+                .expect("Failed to create dir in test");
+        }
+    }
 }
