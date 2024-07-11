@@ -1,11 +1,10 @@
 use std::path::Path;
 
-use rm_regex::{collect_entries, destructure_args, print_collected_entries, visit_dirs};
+use rm_regex::{destructure_args, visit_dirs};
 
 fn main() {
-    let (_, starting_dir, dir, file) = destructure_args();
-    let entries = collect_entries(&starting_dir).expect("Failed to find entries under the specified starting directory.");
+    let (_, starting_dir, _, _) = destructure_args();
+    let path_buf = Path::new(&starting_dir);
+    let entries = visit_dirs(&path_buf.into());
     println!("{:?}", entries);
-
-    visit_dirs(&Path::new(&starting_dir), &print_collected_entries);
 }

@@ -1,9 +1,11 @@
 //! Fast recursive deletion of files and directories
 use std::{
-    fs::{read_dir, DirEntry}, io, path::Path
+    fs::{metadata, read_dir, read_link, DirEntry, Metadata}, io, path::PathBuf,
+    ffi::OsStr
 };
 
 use clap::{ArgAction, Parser};
+
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -31,81 +33,71 @@ pub fn destructure_args() -> ParsedArgs {
     }
 }
 
-pub fn print_collected_entries(entry: &DirEntry) {
-    println!("{:?}", entry);
+#[derive(Debug)]
+pub struct File {
+    pub name: String,
+    pub metadata: Metadata,
 }
 
-pub fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
-    if dir.is_dir() {
-        for entry in read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                visit_dirs(&path, cb)?;
-            } else {
-                cb(&entry);
-            }
-        }
-    }
-    Ok(())
+#[derive(Debug)]
+pub struct Symlink {
+    pub name: String,
+    pub target: String,
+    pub metadata: Metadata,
 }
 
-pub fn collect_entries(
-    starting_dir: &String,
-) -> Result<Vec<DirEntry>, std::io::Error> {
-    let path = Path::new(starting_dir);
-    read_dir(path)?.collect()
+#[derive(Debug)]
+pub struct Directory {
+    pub name: String,
+    pub entries: Vec<FileTree>
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    mod collect_entries {
-        use std::{
-            fs::{create_dir_all, remove_dir, remove_file, DirBuilder, File},
-            io::Write,
+#[derive(Debug)]
+pub enum FileTree {
+    DirNode(Directory),
+    FileNode(File),
+    LinkNode(Symlink),
+}
+
+pub fn visit_dirs(dir: &PathBuf) -> io::Result<Directory> {
+    let entries: Vec<DirEntry> = read_dir(dir)?
+        .filter_map(|result| result.ok())
+        .collect();
+
+    let mut directory: Vec<FileTree> = Vec::with_capacity(entries.len());
+
+    for entry in entries {
+        let path = entry.path();
+        let name: String = path.file_name().unwrap().to_string_lossy().into();
+        let metadata = metadata(&path).unwrap();
+        let node = match path {
+            path if path.is_dir() => {
+                FileTree::DirNode(
+                    visit_dirs(dir)?
+                    )
+            },
+            path if path.is_file() => FileTree::FileNode(File {
+                name: name.into(),
+                metadata,
+            }),
+            path if path.is_symlink() => FileTree::LinkNode(Symlink {
+                name: name.into(),
+                target: read_link(path).unwrap().to_string_lossy().into(),
+                metadata,
+            }),
+            _ => unreachable!(),
         };
+        directory.push(node);
+    };
 
-        use super::collect_entries;
-        #[test]
-        fn should_result_in_err_with_nonexistent_dir() {
-            let result = collect_entries(&String::from("nonexistent_dir"));
-            assert!(result.is_err());
-        }
+    let name: String = dir
+        .file_name()
+        .unwrap_or(OsStr::new("."))
+        .to_string_lossy()
+        .into();
 
-        #[test]
-        fn should_return_ok_if_dir_exists() {
-            let path = "./foo";
-
-            // creating empty dir
-            DirBuilder::new()
-                .create(path)
-                .expect("Failed to create dir in test");
-            let result = collect_entries(&path.to_owned());
-
-            // remove dir
-            remove_dir(path).expect("Failed to delete created dir");
-
-            assert!(result.is_ok());
-        }
-
-        #[test]
-        fn should_return_all_the_entries_in_a_dir() {
-            create_dir_all("./bar/baz").expect("Failed to create dirs");
-
-            let mut f = File::create("./bar/foo.txt").expect("Failed to create new file.");
-            f.write_all(b"test")
-                .expect("Failed to write to created file.");
-
-            let result = collect_entries(&"./bar/".to_owned());
-
-            // remove mocked files and dir
-            remove_dir("./bar/baz").expect("Failed to remove foo/bar");
-            remove_file("./bar/foo.txt").expect("Failed to remove foo/baz.txt");
-            remove_dir("./bar").expect("Failed to remove foo");
-
-            assert!(result.is_ok());
-            assert_eq!(result.unwrap().len(), 2);
-        }
-    }
+    Ok(Directory {
+        name,
+        entries: directory
+    })
 }
