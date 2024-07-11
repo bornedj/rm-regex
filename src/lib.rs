@@ -1,7 +1,6 @@
 //! Fast recursive deletion of files and directories
 use std::{
-    fs::{read_dir, DirEntry},
-    path::Path,
+    fs::{read_dir, DirEntry}, io, path::Path
 };
 
 use clap::{ArgAction, Parser};
@@ -30,6 +29,25 @@ pub fn destructure_args() -> ParsedArgs {
         Some(path) => (cli.expression, path, cli.dir, cli.file),
         None => (cli.expression, "./".to_owned(), cli.dir, cli.file),
     }
+}
+
+pub fn print_collected_entries(entry: &DirEntry) {
+    println!("{:?}", entry);
+}
+
+pub fn visit_dirs(dir: &Path, cb: &dyn Fn(&DirEntry)) -> io::Result<()> {
+    if dir.is_dir() {
+        for entry in read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                visit_dirs(&path, cb)?;
+            } else {
+                cb(&entry);
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn collect_entries(
